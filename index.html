@@ -2,7 +2,6 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Blackjack</title>
   <style>
     body {
@@ -12,22 +11,8 @@
       text-align: center;
       padding: 20px;
     }
-
-    h1 {
-      margin-bottom: 20px;
-    }
-
-    .chips {
-      margin-bottom: 10px;
-    }
-
-    .karten {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin: 15px 0;
-    }
-
+    h1 { margin-bottom: 20px; }
+    .karten { display: flex; justify-content: center; gap: 10px; margin: 15px 0; }
     .karte {
       width: 60px;
       height: 90px;
@@ -40,9 +25,7 @@
       font-weight: bold;
       font-size: 18px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-      transition: transform 0.3s;
     }
-
     button {
       margin: 8px;
       padding: 10px 20px;
@@ -53,15 +36,15 @@
       color: white;
       cursor: pointer;
     }
-
-    button:hover {
-      background-color: #4752c4;
+    button:hover { background-color: #4752c4; }
+    input[type="number"] {
+      padding: 6px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: none;
+      width: 80px;
+      margin: 10px;
     }
-
-    #steuerung {
-      margin-top: 20px;
-    }
-
     .sound-toggle {
       position: fixed;
       top: 10px;
@@ -72,19 +55,21 @@
 <body>
   <h1>🃏 Blackjack</h1>
 
-  <div class="chips">💰 Chips: <span id="chips">1000</span></div>
+  <div>💰 Chips: <span id="chips">1000</span></div>
+  <label>
+    Chips setzen:
+    <input type="number" id="einsatzEingabe" placeholder="z.B. 200" min="1">
+    <button onclick="setzeEinsatz()">Setzen</button>
+  </label>
   <div>Aktueller Einsatz: <span id="einsatz">0</span></div>
 
-  <div>
-    <button onclick="setzeEinsatz(100)">100</button>
-    <button onclick="setzeEinsatz(200)">200</button>
-    <button onclick="setzeEinsatz(500)">500</button>
-  </div>
-
+  <h3>Deine Karten (<span id="spielerPunkte">0</span> Punkte):</h3>
   <div class="karten" id="spielerKarten"></div>
+
+  <h3>Dealer-Karten (<span id="dealerPunkte">0</span> Punkte):</h3>
   <div class="karten" id="dealerKarten"></div>
 
-  <div id="steuerung">
+  <div>
     <button onclick="karteZiehen()">Karte ziehen</button>
     <button onclick="bleiben()">Bleiben</button>
     <button onclick="neustart()">🔁 Neustart</button>
@@ -108,9 +93,7 @@
       const karten = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
       deck.length = 0;
       for (let i = 0; i < 4; i++) {
-        for (let karte of karten) {
-          deck.push(karte);
-        }
+        for (let karte of karten) deck.push(karte);
       }
     }
 
@@ -142,14 +125,21 @@
     function zeigeKarten() {
       const spieler = document.getElementById("spielerKarten");
       const dealer = document.getElementById("dealerKarten");
+      const spielerPunkte = document.getElementById("spielerPunkte");
+      const dealerPunkte = document.getElementById("dealerPunkte");
+
       spieler.innerHTML = "";
       dealer.innerHTML = "";
+
       for (let k of spielerHand) {
         spieler.innerHTML += `<div class="karte">${k}</div>`;
       }
       for (let k of dealerHand) {
         dealer.innerHTML += `<div class="karte">${k}</div>`;
       }
+
+      spielerPunkte.textContent = berechnePunkte(spielerHand);
+      dealerPunkte.textContent = spielBeendet ? berechnePunkte(dealerHand) : "?";
     }
 
     function karteZiehen() {
@@ -183,23 +173,28 @@
       }
     }
 
-    function setzeEinsatz(betrag) {
+    function setzeEinsatz() {
       if (!spielBeendet) {
         alert("Setze deinen Einsatz vor dem Start!");
         return;
       }
 
-      if (betrag > chips) {
+      const eingabe = parseInt(document.getElementById("einsatzEingabe").value);
+      if (isNaN(eingabe) || eingabe <= 0) {
+        alert("Bitte gültigen Einsatz eingeben.");
+        return;
+      }
+
+      if (eingabe > chips) {
         alert("Du hast nicht genug Chips!");
         return;
       }
 
-      einsatz = betrag;
-      chips -= betrag;
+      einsatz = eingabe;
+      chips -= einsatz;
       document.getElementById("einsatz").textContent = einsatz;
       document.getElementById("chips").textContent = chips;
 
-      // Spiel starten
       starteSpiel();
     }
 
@@ -238,12 +233,13 @@
       document.getElementById("spielerKarten").innerHTML = "";
       document.getElementById("dealerKarten").innerHTML = "";
       document.getElementById("status").textContent = "";
+      document.getElementById("spielerPunkte").textContent = "0";
+      document.getElementById("dealerPunkte").textContent = "0";
     }
 
     function spieleSound(typ) {
       const soundAktiv = document.getElementById("soundToggle").checked;
       if (!soundAktiv) return;
-
       let audio;
       if (typ === "start") {
         audio = new Audio("https://www.myinstants.com/media/sounds/shuffle.mp3");
@@ -256,7 +252,6 @@
     // Initial
     neuesDeck();
     document.getElementById("chips").textContent = chips;
-    document.getElementById("einsatz").textContent = einsatz;
   </script>
 </body>
 </html>
