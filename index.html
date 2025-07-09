@@ -2,271 +2,261 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Blackjack mit Sound & Chips</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blackjack</title>
   <style>
     body {
-      background-color: #1e1e2f;
-      color: white;
       font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #1e1e2f, #2e2e3f);
+      color: white;
       text-align: center;
       padding: 20px;
-      transition: background 0.3s, color 0.3s;
-    }
-
-    body.light {
-      background-color: #f5f5f5;
-      color: #111;
     }
 
     h1 {
-      font-size: 32px;
+      margin-bottom: 20px;
     }
 
-    .cards {
+    .chips {
+      margin-bottom: 10px;
+    }
+
+    .karten {
       display: flex;
       justify-content: center;
       gap: 10px;
-      flex-wrap: wrap;
-      margin: 10px 0;
+      margin: 15px 0;
     }
 
-    .card {
+    .karte {
+      width: 60px;
+      height: 90px;
       background: white;
       color: black;
-      padding: 10px;
       border-radius: 6px;
-      width: 50px;
-      height: 70px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
       font-weight: bold;
-      opacity: 0;
-      transform: translateY(-10px);
-      animation: fadeIn 0.4s forwards;
-    }
-
-    @keyframes fadeIn {
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    body:not(.light) .card {
-      background: #ddd;
+      font-size: 18px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      transition: transform 0.3s;
     }
 
     button {
+      margin: 8px;
       padding: 10px 20px;
       font-size: 16px;
-      margin: 5px;
       border: none;
-      border-radius: 5px;
+      border-radius: 6px;
       background-color: #5865F2;
       color: white;
       cursor: pointer;
     }
 
-    .zurueck {
-      margin-top: 30px;
-      background-color: gray;
+    button:hover {
+      background-color: #4752c4;
     }
 
-    #message {
-      font-size: 18px;
-      margin-top: 15px;
-      font-weight: bold;
+    #steuerung {
+      margin-top: 20px;
     }
 
     .sound-toggle {
       position: fixed;
       top: 10px;
       left: 10px;
-      background-color: #444;
-    }
-
-    .chip-info {
-      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-
-  <button class="sound-toggle" onclick="toggleSound()">🔊</button>
-
   <h1>🃏 Blackjack</h1>
 
-  <div class="chip-info">
-    💰 Chips: <span id="chips">100</span> |
-    Einsatz: <input type="number" id="bet" value="10" min="1" style="width: 60px;">
-  </div>
-
-  <h2>Deine Karten (<span id="player-total">0</span>)</h2>
-  <div class="cards" id="player-cards"></div>
-
-  <h2>Gegner Karten (<span id="dealer-total">?</span>)</h2>
-  <div class="cards" id="dealer-cards"></div>
-
-  <div id="message"></div>
+  <div class="chips">💰 Chips: <span id="chips">1000</span></div>
+  <div>Aktueller Einsatz: <span id="einsatz">0</span></div>
 
   <div>
-    <button onclick="hit()">Karte ziehen</button>
-    <button onclick="stand()">Passen</button>
-    <button onclick="restart()">Neu starten</button>
+    <button onclick="setzeEinsatz(100)">100</button>
+    <button onclick="setzeEinsatz(200)">200</button>
+    <button onclick="setzeEinsatz(500)">500</button>
   </div>
 
-  <button class="zurueck" onclick="window.location.href='Webseite.html'">Zurück</button>
+  <div class="karten" id="spielerKarten"></div>
+  <div class="karten" id="dealerKarten"></div>
 
-  <!-- Soundeffekte -->
-  <audio id="cardSound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_1b52ddf7d3.mp3"></audio>
-  <audio id="winSound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_09c82c309f.mp3"></audio>
-  <audio id="loseSound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_05759be6a3.mp3"></audio>
+  <div id="steuerung">
+    <button onclick="karteZiehen()">Karte ziehen</button>
+    <button onclick="bleiben()">Bleiben</button>
+    <button onclick="neustart()">🔁 Neustart</button>
+  </div>
+
+  <p id="status"></p>
+
+  <label class="sound-toggle">
+    <input type="checkbox" id="soundToggle" checked> Soundeffekte
+  </label>
 
   <script>
-    const suits = ["♠", "♥", "♦", "♣"];
-    const values = [
-      { name: "A", value: 11 }, { name: "2", value: 2 }, { name: "3", value: 3 },
-      { name: "4", value: 4 }, { name: "5", value: 5 }, { name: "6", value: 6 },
-      { name: "7", value: 7 }, { name: "8", value: 8 }, { name: "9", value: 9 },
-      { name: "10", value: 10 }, { name: "J", value: 10 }, { name: "Q", value: 10 }, { name: "K", value: 10 }
-    ];
+    const deck = [];
+    let spielerHand = [];
+    let dealerHand = [];
+    let chips = 1000;
+    let einsatz = 0;
+    let spielBeendet = true;
 
-    let deck = [], player = [], dealer = [], used = [], finished = false;
-    let chips = 100, soundOn = true;
-
-    const cardSound = document.getElementById("cardSound");
-    const winSound = document.getElementById("winSound");
-    const loseSound = document.getElementById("loseSound");
-
-    function buildDeck() {
-      deck = [];
-      for (let suit of suits) {
-        for (let v of values) {
-          deck.push({ text: v.name + suit, value: v.value });
+    function neuesDeck() {
+      const karten = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+      deck.length = 0;
+      for (let i = 0; i < 4; i++) {
+        for (let karte of karten) {
+          deck.push(karte);
         }
       }
     }
 
-    function drawCard() {
-      let card;
-      do {
-        card = deck[Math.floor(Math.random() * deck.length)];
-      } while (used.includes(card));
-      used.push(card);
-      if (soundOn) cardSound.play();
-      return card;
+    function karteZiehenVomDeck() {
+      const index = Math.floor(Math.random() * deck.length);
+      return deck.splice(index, 1)[0];
     }
 
-    function calculateTotal(hand) {
-      let total = hand.reduce((sum, c) => sum + c.value, 0);
-      let aces = hand.filter(c => c.text.startsWith("A")).length;
-      while (total > 21 && aces > 0) {
-        total -= 10;
-        aces--;
+    function berechnePunkte(hand) {
+      let sum = 0;
+      let asse = 0;
+      for (let karte of hand) {
+        if (karte === "A") {
+          asse++;
+          sum += 11;
+        } else if (["K", "Q", "J"].includes(karte)) {
+          sum += 10;
+        } else {
+          sum += parseInt(karte);
+        }
       }
-      return total;
+      while (sum > 21 && asse > 0) {
+        sum -= 10;
+        asse--;
+      }
+      return sum;
     }
 
-    function updateUI() {
-      document.getElementById("chips").textContent = chips;
-      document.getElementById("player-total").textContent = calculateTotal(player);
-      document.getElementById("dealer-total").textContent = finished ? calculateTotal(dealer) : "?";
-
-      const pc = document.getElementById("player-cards");
-      const dc = document.getElementById("dealer-cards");
-      pc.innerHTML = "";
-      dc.innerHTML = "";
-
-      player.forEach(c => {
-        const div = document.createElement("div");
-        div.className = "card";
-        div.textContent = c.text;
-        pc.appendChild(div);
-      });
-
-      dealer.forEach((c, i) => {
-        const div = document.createElement("div");
-        div.className = "card";
-        div.textContent = (i === 0 || finished) ? c.text : "🂠";
-        dc.appendChild(div);
-      });
-    }
-
-    function hit() {
-      if (finished) return;
-      player.push(drawCard());
-      updateUI();
-      if (calculateTotal(player) > 21) {
-        lose();
+    function zeigeKarten() {
+      const spieler = document.getElementById("spielerKarten");
+      const dealer = document.getElementById("dealerKarten");
+      spieler.innerHTML = "";
+      dealer.innerHTML = "";
+      for (let k of spielerHand) {
+        spieler.innerHTML += `<div class="karte">${k}</div>`;
+      }
+      for (let k of dealerHand) {
+        dealer.innerHTML += `<div class="karte">${k}</div>`;
       }
     }
 
-    function stand() {
-      if (finished) return;
-      while (calculateTotal(dealer) < 17) {
-        dealer.push(drawCard());
+    function karteZiehen() {
+      if (spielBeendet) return;
+      spielerHand.push(karteZiehenVomDeck());
+      zeigeKarten();
+      spieleSound("ziehen");
+
+      const punkte = berechnePunkte(spielerHand);
+      if (punkte > 21) {
+        ende("❌ Du hast verloren!");
+      }
+    }
+
+    function bleiben() {
+      if (spielBeendet) return;
+      while (berechnePunkte(dealerHand) < 17) {
+        dealerHand.push(karteZiehenVomDeck());
       }
 
-      const p = calculateTotal(player);
-      const d = calculateTotal(dealer);
+      const spielerPunkte = berechnePunkte(spielerHand);
+      const dealerPunkte = berechnePunkte(dealerHand);
 
-      if (d > 21 || p > d) {
-        win();
-      } else if (p === d) {
-        endGame("⚖️ Unentschieden.");
+      if (dealerPunkte > 21 || spielerPunkte > dealerPunkte) {
+        gewinn();
+      } else if (spielerPunkte < dealerPunkte) {
+        ende("❌ Dealer gewinnt!");
       } else {
-        lose();
+        ende("🤝 Unentschieden");
+        chips += einsatz;
       }
     }
 
-    function win() {
-      const bet = getBet();
-      chips += bet;
-      if (soundOn) winSound.play();
-      endGame("🏆 Du hast gewonnen!");
+    function setzeEinsatz(betrag) {
+      if (!spielBeendet) {
+        alert("Setze deinen Einsatz vor dem Start!");
+        return;
+      }
+
+      if (betrag > chips) {
+        alert("Du hast nicht genug Chips!");
+        return;
+      }
+
+      einsatz = betrag;
+      chips -= betrag;
+      document.getElementById("einsatz").textContent = einsatz;
+      document.getElementById("chips").textContent = chips;
+
+      // Spiel starten
+      starteSpiel();
     }
 
-    function lose() {
-      const bet = getBet();
-      chips -= bet;
-      if (soundOn) loseSound.play();
-      endGame("😞 Du hast verloren.");
+    function starteSpiel() {
+      spielBeendet = false;
+      document.getElementById("status").textContent = "";
+      spielerHand = [karteZiehenVomDeck(), karteZiehenVomDeck()];
+      dealerHand = [karteZiehenVomDeck()];
+      zeigeKarten();
+      spieleSound("start");
     }
 
-    function endGame(msg) {
-      finished = true;
-      document.getElementById("message").textContent = msg;
-      updateUI();
+    function gewinn() {
+      let gewinn = einsatz * 2;
+      chips += gewinn;
+      ende("🎉 Du hast gewonnen!");
     }
 
-    function restart() {
-      used = [];
-      finished = false;
-      player = [drawCard(), drawCard()];
-      dealer = [drawCard(), drawCard()];
-      document.getElementById("message").textContent = "";
-      updateUI();
+    function ende(nachricht) {
+      spielBeendet = true;
+      zeigeKarten();
+      document.getElementById("status").textContent = nachricht;
+      document.getElementById("chips").textContent = chips;
+      einsatz = 0;
+      document.getElementById("einsatz").textContent = einsatz;
     }
 
-    function getBet() {
-      return Math.max(1, parseInt(document.getElementById("bet").value)) || 10;
+    function neustart() {
+      if (!spielBeendet) {
+        alert("Das Spiel ist noch nicht beendet!");
+        return;
+      }
+      neuesDeck();
+      einsatz = 0;
+      document.getElementById("einsatz").textContent = einsatz;
+      document.getElementById("spielerKarten").innerHTML = "";
+      document.getElementById("dealerKarten").innerHTML = "";
+      document.getElementById("status").textContent = "";
     }
 
-    function toggleSound() {
-      soundOn = !soundOn;
-      document.querySelector(".sound-toggle").textContent = soundOn ? "🔊" : "🔇";
+    function spieleSound(typ) {
+      const soundAktiv = document.getElementById("soundToggle").checked;
+      if (!soundAktiv) return;
+
+      let audio;
+      if (typ === "start") {
+        audio = new Audio("https://www.myinstants.com/media/sounds/shuffle.mp3");
+      } else if (typ === "ziehen") {
+        audio = new Audio("https://www.myinstants.com/media/sounds/card-flip.mp3");
+      }
+      if (audio) audio.play();
     }
 
-    // Theme übernehmen
-    const theme = localStorage.getItem("theme");
-    if (theme === "light") {
-      document.body.classList.add("light");
-    }
-
-    buildDeck();
-    restart();
+    // Initial
+    neuesDeck();
+    document.getElementById("chips").textContent = chips;
+    document.getElementById("einsatz").textContent = einsatz;
   </script>
 </body>
 </html>
